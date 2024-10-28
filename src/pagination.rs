@@ -4,13 +4,12 @@ use diesel::query_builder::*;
 use diesel::query_dsl::methods::LoadQuery;
 use diesel::sql_types::BigInt;
 
-pub trait Paginate: Sized {
-    fn paginate(self, page: i64) -> DebugQuery<Self>;
+pub trait Debugable: Sized {
+    fn debug(self) -> DebugQuery<Self>;
 }
 
-impl<T> Paginate for T {
-    fn paginate(self, page: i64) -> DebugQuery<Self> {
-        println!("Paginating to page {}", page);
+impl<T> Debugable for T {
+    fn debug(self) -> DebugQuery<Self> {
         DebugQuery { inner: self }
     }
 }
@@ -21,29 +20,24 @@ pub struct DebugQuery<T> {
 }
 
 impl<T> DebugQuery<T> {
-    pub fn per_page(self) -> Self {
-        DebugQuery {
-            ..self
-        }
-    }
 
-    pub fn load_and_count_pages<'a, U>(self, conn: &mut PgConnection) -> QueryResult<(Vec<U>, i64)>
+    pub fn exec<'a, U>(self, conn: &mut PgConnection) -> QueryResult<Vec<U>>
     where
-        Self: LoadQuery<'a, PgConnection, (U, i64)>,
+        Self: LoadQuery<'a, PgConnection, U>,
     {
-        let results = self.load::<(U, i64)>(conn)?;
-        let total = results.first().map(|x| x.1).unwrap_or(0);
-        let records = results.into_iter().map(|x| x.0).collect();
-        Ok((records, total))
+        let results = self.load::<U>(conn)?;
+        Ok(results)
     }
 }
 
 impl<T: Query> Query for DebugQuery<T> {
-    type SqlType = (T::SqlType, BigInt);
+    type SqlType = T::SqlType;
 }
 
 
-impl<T> RunQueryDsl<PgConnection> for DebugQuery<T> {}
+impl<T> RunQueryDsl<PgConnection> for DebugQuery<T> {
+
+}
 
 
 impl<T> QueryFragment<Pg> for DebugQuery<T>
@@ -56,4 +50,6 @@ where
         out.push_sql(format!("; -- QUERY_ID={}", uuid).as_str());
         Ok(())
     }
+
+    
 }
