@@ -66,7 +66,7 @@ fn main() {
         .limit(5)
         .select(Post::as_select())
         .debug()
-        .exec(connection)
+        .load(connection)
         .expect("Error loading posts");
 
     println!("{:?}", results);

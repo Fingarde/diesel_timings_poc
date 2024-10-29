@@ -10,34 +10,29 @@ pub trait Debugable: Sized {
 
 impl<T> Debugable for T {
     fn debug(self) -> DebugQuery<Self> {
-        DebugQuery { inner: self }
+        let uuid = uuid::Uuid::new_v4();
+
+        DebugQuery {
+            uuid,
+            inner: self
+        }
     }
 }
 
 #[derive(Debug, Clone, Copy, QueryId)]
 pub struct DebugQuery<T> {
+    uuid: uuid::Uuid,
     inner: T,
 }
 
-impl<T> DebugQuery<T> {
-
-    pub fn exec<'a, U>(self, conn: &mut PgConnection) -> QueryResult<Vec<U>>
-    where
-        Self: LoadQuery<'a, PgConnection, U>,
-    {
-        let results = self.load::<U>(conn)?;
-        Ok(results)
-    }
-}
+impl<T> DebugQuery<T> { }
 
 impl<T: Query> Query for DebugQuery<T> {
     type SqlType = T::SqlType;
 }
 
 
-impl<T> RunQueryDsl<PgConnection> for DebugQuery<T> {
-
-}
+impl<T> RunQueryDsl<PgConnection> for DebugQuery<T> { }
 
 
 impl<T> QueryFragment<Pg> for DebugQuery<T>
@@ -45,11 +40,8 @@ where
     T: QueryFragment<Pg>,
 {
     fn walk_ast<'b>(&'b self, mut out: AstPass<'_, 'b, Pg>) -> QueryResult<()> {
-        let uuid = uuid::Uuid::new_v4();
         self.inner.walk_ast(out.reborrow())?;
-        out.push_sql(format!("; -- QUERY_ID={}", uuid).as_str());
+        out.push_sql(format!("; -- QUERY_ID={}", self.uuid).as_str());
         Ok(())
     }
-
-    
 }
